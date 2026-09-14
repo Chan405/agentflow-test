@@ -2,9 +2,13 @@ const fs = require("fs");
 const path = require("path");
 
 const { fakeAgent } = require("../examples/fake-agent");
+const localAdapter = require("./adapters/local");
+const httpAdapter = require("./adapters/http");
 const { evaluate } = require("./evaluator");
 
 const WORKFLOWS_PATH = path.join(__dirname, "..", "tests", "workflows.json");
+const CONFIG_PATH = path.join(__dirname, "..", "agentflow.config.json");
+const DEFAULT_CONFIG = { type: "local" };
 
 function printFailure(failure) {
   const lines = failure.split("\n");
@@ -38,7 +42,45 @@ function validateTestCase(test, index) {
   return null;
 }
 
+function loadConfig() {
+  if (!fs.existsSync(CONFIG_PATH)) {
+    return DEFAULT_CONFIG;
+  }
+
+  const config = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
+
+  if (!config || typeof config !== "object") {
+    throw new Error("agentflow.config.json must contain an object");
+  }
+
+  const type = config.type || "local";
+
+  if (type !== "local" && type !== "http") {
+    throw new Error(`Unsupported adapter type "${type}"`);
+  }
+
+  if (type === "http" && (typeof config.endpoint !== "string" || config.endpoint.length === 0)) {
+    throw new Error('HTTP adapter requires an "endpoint"');
+  }
+
+  return {
+    type,
+    endpoint: config.endpoint,
+  };
+}
+
+function createExecutor(config) {
+  if (config.type === "http") {
+    return (input) => httpAdapter.run(config.endpoint, input);
+  }
+
+  return (input) =>
+    localAdapter.run((agentInput) => fakeAgent(agentInput.message), input);
+}
+
 async function run() {
+  const config = loadConfig();
+  const execute = createExecutor(config);
   const tests = JSON.parse(fs.readFileSync(WORKFLOWS_PATH, "utf8"));
 
   if (!Array.isArray(tests)) {
@@ -64,7 +106,7 @@ async function run() {
     }
 
     try {
-      const result = await fakeAgent(test.input.message);
+      const result = await execute(test.input);
       const evaluation = evaluate(result, test.expect);
 
       if (evaluation.passed) {
@@ -92,10 +134,10 @@ async function run() {
   console.log(`${failed} failed`);
   console.log("-------------------");
 
-  process.exit(failed > 0 ? 1 : 0);
+  process.exitCode = failed > 0 ? 1 : 0;
 }
 
 run().catch((error) => {
   console.error(error.message);
-  process.exit(1);
+  process.exitCode = 1;
 });
