@@ -1,0 +1,62 @@
+[
+  {
+    "name": "wifi issue routes to troubleshooting",
+    "input": {
+      "message": "My wifi keeps dropping every few minutes"
+    },
+    "expect": {
+      "agents": ["orchestrator", "troubleshooting_agent"]
+    }
+  },
+  {
+    "name": "plan inquiry selects plans tool",
+    "input": {
+      "message": "What pricing plans do you offer?"
+    },
+    "expect": {
+      "tools": ["plans_tool"]
+    }
+  },
+  {
+    "name": "connection outage passes internet argument",
+    "input": {
+      "message": "My network connection is completely down"
+    },
+    "expect": {
+      "agents": ["orchestrator", "troubleshooting_agent"],
+      "toolArguments": {
+        "diagnostic_tool": {
+          "connection": "internet"
+        }
+      }
+    }
+  },
+  {
+    "name": "troubleshooting never invokes sales agent",
+    "input": {
+      "message": "My internet is not working"
+    },
+    "expect": {
+      "forbiddenAgents": ["sales_agent"]
+    }
+  },
+  {
+    "name": "upgrade request follows sales handoff path",
+    "input": {
+      "message": "I want to upgrade my subscription"
+    },
+    "expect": {
+      "agentPath": ["orchestrator", "sales_agent"]
+    }
+  },
+  {
+    "name": "off-topic question stays at orchestrator without tools",
+    "input": {
+      "message": "Tell me a joke about robots"
+    },
+    "expect": {
+      "agents": ["orchestrator"],
+      "forbiddenTools": ["diagnostic_tool", "plans_tool"]
+    }
+  }
+]

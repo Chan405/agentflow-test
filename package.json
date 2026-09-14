@@ -1,0 +1,11 @@
+{
+  "name": "agentflow-test",
+  "version": "0.1.0",
+  "description": "Lightweight regression testing for AI agent workflows",
+  "main": "src/evaluator.js",
+  "scripts": {
+    "test": "node src/runner.js"
+  },
+  "keywords": ["agent", "testing", "regression", "cli"],
+  "license": "MIT"
+}
