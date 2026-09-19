@@ -1,20 +1,13 @@
+const { inspectAgentResult } = require("../result");
+
 function normalizeResult(parsed) {
-  if (!parsed || typeof parsed !== "object") {
-    throw new Error("HTTP adapter received invalid JSON");
+  const inspected = inspectAgentResult(parsed);
+
+  if (!inspected.ok) {
+    throw new Error(inspected.error);
   }
 
-  if (!Object.prototype.hasOwnProperty.call(parsed, "trace") || parsed.trace == null) {
-    throw new Error("HTTP adapter response is missing trace");
-  }
-
-  if (!Array.isArray(parsed.trace)) {
-    throw new Error("HTTP adapter response trace is not an array");
-  }
-
-  return {
-    output: typeof parsed.output === "string" ? parsed.output : String(parsed.output ?? ""),
-    trace: parsed.trace,
-  };
+  return inspected.result;
 }
 
 async function run(endpoint, input) {

@@ -5,7 +5,17 @@
       "message": "My wifi keeps dropping every few minutes"
     },
     "expect": {
-      "agents": ["orchestrator", "troubleshooting_agent"]
+      "agents": ["orchestrator", "troubleshooting_agent"],
+      "agentPath": ["orchestrator", "troubleshooting_agent"],
+      "tracePath": [
+        { "type": "agent", "name": "orchestrator" },
+        { "type": "agent", "name": "troubleshooting_agent" },
+        { "type": "tool", "name": "diagnostic_tool" }
+      ],
+      "output": {
+        "contains": ["troubleshoot"],
+        "notContains": ["upgrade"]
+      }
     }
   },
   {
@@ -56,7 +66,12 @@
     },
     "expect": {
       "agents": ["orchestrator"],
-      "forbiddenTools": ["diagnostic_tool", "plans_tool"]
+      "agentPath": ["orchestrator"],
+      "forbiddenAgents": ["sales_agent"],
+      "forbiddenTools": ["diagnostic_tool", "plans_tool"],
+      "output": {
+        "equals": "I'm not sure how to help with that."
+      }
     }
   }
 ]

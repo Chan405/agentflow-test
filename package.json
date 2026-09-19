@@ -4,7 +4,7 @@
   "description": "Lightweight regression testing for AI agent workflows",
   "main": "src/evaluator.js",
   "scripts": {
-    "test": "node src/runner.js"
+    "test": "node --test tests/evaluator.test.js tests/validate.test.js tests/result.test.js tests/report.test.js && node src/runner.js"
   },
   "keywords": ["agent", "testing", "regression", "cli"],
   "license": "MIT"

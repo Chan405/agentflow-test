@@ -5,41 +5,53 @@ const { fakeAgent } = require("../examples/fake-agent");
 const localAdapter = require("./adapters/local");
 const httpAdapter = require("./adapters/http");
 const { evaluate } = require("./evaluator");
+const { validateTestCase } = require("./validate");
+const {
+  formatAssertionDetails,
+  formatConfigDetails,
+  formatExecutionDetails,
+  formatSummary,
+  indentDetails,
+} = require("./report");
 
 const WORKFLOWS_PATH = path.join(__dirname, "..", "tests", "workflows.json");
 const CONFIG_PATH = path.join(__dirname, "..", "agentflow.config.json");
 const DEFAULT_CONFIG = { type: "local" };
 
-function printFailure(failure) {
-  const lines = failure.split("\n");
+function testDisplayName(test, index) {
+  if (test && typeof test.name === "string" && test.name.length > 0) {
+    return test.name;
+  }
 
-  console.log(`  → ${lines[0]}`);
+  return `test ${index}`;
+}
 
-  for (let i = 1; i < lines.length; i++) {
-    console.log(`    ${lines[i]}`);
+function printLines(lines) {
+  for (const line of lines) {
+    console.log(line);
   }
 }
 
-function validateTestCase(test, index) {
-  const label = `Test case at index ${index}`;
+function createPrinter() {
+  let printed = false;
 
-  if (!test || typeof test !== "object") {
-    return `${label} must be an object`;
+  function printPass(name) {
+    console.log(`✓ ${name}`);
+    printed = true;
   }
 
-  if (typeof test.name !== "string" || test.name.length === 0) {
-    return `${label} is missing a valid "name"`;
+  function printIssue(name, detailLines) {
+    if (printed) {
+      console.log("");
+    }
+
+    console.log(`✗ ${name}`);
+    console.log("");
+    printLines(indentDetails(detailLines));
+    printed = true;
   }
 
-  if (!test.input || typeof test.input.message !== "string") {
-    return `Test "${test.name}" is missing input.message`;
-  }
-
-  if (!test.expect || typeof test.expect !== "object") {
-    return `Test "${test.name}" is missing expect`;
-  }
-
-  return null;
+  return { printPass, printIssue };
 }
 
 function loadConfig() {
@@ -91,17 +103,20 @@ async function run() {
   console.log("AgentFlow Test");
   console.log("");
 
+  const printer = createPrinter();
   let passed = 0;
   let failed = 0;
+  let configErrors = 0;
+  let executionErrors = 0;
 
   for (let index = 0; index < tests.length; index++) {
     const test = tests[index];
-    const validationError = validateTestCase(test, index);
+    const name = testDisplayName(test, index);
+    const validation = validateTestCase(test, index);
 
-    if (validationError) {
-      console.log(`✗ ${test && test.name ? test.name : `test ${index}`}`);
-      printFailure(validationError);
-      failed++;
+    if (!validation.valid) {
+      printer.printIssue(name, formatConfigDetails(validation));
+      configErrors++;
       continue;
     }
 
@@ -109,32 +124,33 @@ async function run() {
       const result = await execute(test.input);
       const evaluation = evaluate(result, test.expect);
 
-      if (evaluation.passed) {
-        console.log(`✓ ${test.name}`);
+      if (evaluation.executionError) {
+        printer.printIssue(name, formatExecutionDetails(evaluation.executionError));
+        executionErrors++;
+      } else if (evaluation.passed) {
+        printer.printPass(name);
         passed++;
       } else {
-        console.log(`✗ ${test.name}`);
-
-        for (const failure of evaluation.failures) {
-          printFailure(failure);
-        }
-
+        printer.printIssue(name, formatAssertionDetails(evaluation.failures));
         failed++;
       }
     } catch (error) {
-      console.log(`✗ ${test.name}`);
-      printFailure(`Agent execution failed: ${error.message}`);
-      failed++;
+      printer.printIssue(name, formatExecutionDetails(error.message));
+      executionErrors++;
     }
   }
 
   console.log("");
-  console.log("-------------------");
-  console.log(`${passed} passed`);
-  console.log(`${failed} failed`);
-  console.log("-------------------");
+  printLines(
+    formatSummary({
+      passed,
+      failed,
+      configErrors,
+      executionErrors,
+    })
+  );
 
-  process.exitCode = failed > 0 ? 1 : 0;
+  process.exitCode = failed > 0 || configErrors > 0 || executionErrors > 0 ? 1 : 0;
 }
 
 run().catch((error) => {

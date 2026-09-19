@@ -1,20 +1,13 @@
+const { inspectAgentResult } = require("../result");
+
 function normalizeResult(result) {
-  if (!result || typeof result !== "object") {
-    throw new Error("Local adapter result must be an object");
+  const inspected = inspectAgentResult(result);
+
+  if (!inspected.ok) {
+    throw new Error(inspected.error);
   }
 
-  if (!Object.prototype.hasOwnProperty.call(result, "trace") || result.trace == null) {
-    throw new Error("Local adapter result is missing trace");
-  }
-
-  if (!Array.isArray(result.trace)) {
-    throw new Error("Local adapter result trace is not an array");
-  }
-
-  return {
-    output: typeof result.output === "string" ? result.output : String(result.output ?? ""),
-    trace: result.trace,
-  };
+  return inspected.result;
 }
 
 async function run(agentFn, input) {
