@@ -1,5 +1,5 @@
 const http = require("http");
-const { fakeAgent } = require("./fake-agent");
+const { run } = require("../local/fake-agent");
 
 const PORT = 3001;
 
@@ -13,6 +13,7 @@ function readBody(req) {
     const chunks = [];
 
     req.on("data", (chunk) => chunks.push(chunk));
+
     req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
     req.on("error", reject);
   });
@@ -33,7 +34,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const result = await fakeAgent(parsed && parsed.message);
+  const result = await run(parsed);
   sendJson(res, 200, result);
 });
 

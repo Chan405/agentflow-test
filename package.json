@@ -1,11 +1,28 @@
 {
   "name": "agentflow-test",
   "version": "0.1.0",
-  "description": "Lightweight regression testing for AI agent workflows",
+  "description": "Regression testing for AI agent workflows",
   "main": "src/evaluator.js",
   "scripts": {
-    "test": "node --test tests/evaluator.test.js tests/validate.test.js tests/result.test.js tests/report.test.js && node src/runner.js"
+    "test": "node --test tests/evaluator.test.js tests/validate.test.js tests/result.test.js tests/report.test.js tests/config.test.js && node src/runner.js"
   },
-  "keywords": ["agent", "testing", "regression", "cli"],
-  "license": "MIT"
+  "keywords": [
+    "agent",
+    "testing",
+    "regression",
+    "cli",
+    "workflow"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Chan405/agentflow-test.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Chan405/agentflow-test/issues"
+  },
+  "homepage": "https://github.com/Chan405/agentflow-test#readme",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
 }

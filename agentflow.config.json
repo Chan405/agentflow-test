@@ -1,4 +1,7 @@
 {
-  "type": "http",
-  "endpoint": "http://localhost:3001/agent"
+  "target": {
+    "type": "http",
+    "endpoint": "http://localhost:3001/agent"
+  },
+  "tests": "./tests/workflows.json"
 }

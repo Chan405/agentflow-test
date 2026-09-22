@@ -1,4 +1,5 @@
-async function fakeAgent(message) {
+async function run(input) {
+  const message = input && typeof input === "object" ? input.message : input;
   const text = String(message || "").toLowerCase();
 
   if (
@@ -43,4 +44,4 @@ async function fakeAgent(message) {
   };
 }
 
-module.exports = { fakeAgent };
+module.exports = { run };

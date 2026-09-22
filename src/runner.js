@@ -1,7 +1,6 @@
 const fs = require("fs");
-const path = require("path");
 
-const { fakeAgent } = require("../examples/fake-agent");
+const { loadConfig } = require("./config");
 const localAdapter = require("./adapters/local");
 const httpAdapter = require("./adapters/http");
 const { evaluate } = require("./evaluator");
@@ -13,10 +12,6 @@ const {
   formatSummary,
   indentDetails,
 } = require("./report");
-
-const WORKFLOWS_PATH = path.join(__dirname, "..", "tests", "workflows.json");
-const CONFIG_PATH = path.join(__dirname, "..", "agentflow.config.json");
-const DEFAULT_CONFIG = { type: "local" };
 
 function testDisplayName(test, index) {
   if (test && typeof test.name === "string" && test.name.length > 0) {
@@ -54,31 +49,15 @@ function createPrinter() {
   return { printPass, printIssue };
 }
 
-function loadConfig() {
-  if (!fs.existsSync(CONFIG_PATH)) {
-    return DEFAULT_CONFIG;
+function loadLocalAgent(modulePath) {
+  const agentModule = require(modulePath);
+  const agentFn = typeof agentModule === "function" ? agentModule : agentModule && agentModule.run;
+
+  if (typeof agentFn !== "function") {
+    throw new Error("Local adapter requires an executable agent function");
   }
 
-  const config = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
-
-  if (!config || typeof config !== "object") {
-    throw new Error("agentflow.config.json must contain an object");
-  }
-
-  const type = config.type || "local";
-
-  if (type !== "local" && type !== "http") {
-    throw new Error(`Unsupported adapter type "${type}"`);
-  }
-
-  if (type === "http" && (typeof config.endpoint !== "string" || config.endpoint.length === 0)) {
-    throw new Error('HTTP adapter requires an "endpoint"');
-  }
-
-  return {
-    type,
-    endpoint: config.endpoint,
-  };
+  return agentFn;
 }
 
 function createExecutor(config) {
@@ -86,18 +65,23 @@ function createExecutor(config) {
     return (input) => httpAdapter.run(config.endpoint, input);
   }
 
-  return (input) =>
-    localAdapter.run((agentInput) => fakeAgent(agentInput.message), input);
+  const agentFn = loadLocalAgent(config.module);
+  return (input) => localAdapter.run(agentFn, input);
 }
 
 async function run() {
   const config = loadConfig();
   const execute = createExecutor(config);
-  const tests = JSON.parse(fs.readFileSync(WORKFLOWS_PATH, "utf8"));
+  let tests;
+
+  try {
+    tests = JSON.parse(fs.readFileSync(config.testsPath, "utf8"));
+  } catch (error) {
+    throw new Error(`${config.tests} contains invalid JSON`);
+  }
 
   if (!Array.isArray(tests)) {
-    console.error("tests/workflows.json must contain an array of test cases");
-    process.exit(1);
+    throw new Error(`${config.tests} must contain an array of test cases`);
   }
 
   console.log("AgentFlow Test");

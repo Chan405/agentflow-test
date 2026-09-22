@@ -2,82 +2,111 @@
 
 Regression testing for AI agent workflows.
 
-This project is experimental. It is a local CLI for checking a normalized agent trace against explicit assertions. It is not a production platform.
-
-## What It Tests
-
-- agent presence
-- tool presence
-- forbidden agents
-- forbidden tools
-- agent path
-- complete agent/tool trace path
-- tool arguments
-- nested tool arguments
-- multiple tool invocations
-- deterministic output assertions
-
-## Why AgentFlow Test
-
-A final reply can look fine while the workflow is wrong. The agent below answers the outage, but it handed off to sales and recommended an upgrade:
+Expected:
 
 ```text
-User: "My internet is still down after restarting"
-
-Output: "Sorry about the downtime. I can troubleshoot that — or you could upgrade."
-
-Trace:
-  orchestrator
-  → sales_agent
-  → plans_tool
+user
+→ orchestrator
+→ troubleshooting_agent
+→ diagnostic_tool
 ```
 
-Output checks alone can miss that. AgentFlow Test also asserts the route: which agents ran, in what order, which tools were called, and with which arguments.
+After a prompt or model change:
 
-## Test Example
+```text
+user
+→ orchestrator
+→ sales_agent
+```
 
-Define cases in `tests/workflows.json`.
+❌ regression
+
+The final reply can still look helpful. AgentFlow Test verifies execution behavior, not just the final natural-language response: which agents ran, in what order, which tools they called, and with which arguments.
+
+## Why AgentFlow Test?
+
+A passing string check on the answer does not mean the workflow is intact. If support starts handing off to sales, or a tool is called with the wrong arguments, you want that to fail the same way a unit test fails.
+
+This repo is a local runner. You write JSON cases, point them at an agent, and assert on a normalized `{ output, trace }`.
+
+## What Can It Test?
+
+- agent and tool presence
+- forbidden agents and tools
+- exact `agentPath` (agents only)
+- exact `tracePath` (agents and tools)
+- tool arguments, including nested objects and a specific invocation via `call`
+- output `equals`, `contains`, and `notContains`
+- malformed tests (unknown `expect` keys, empty `expect`) as config errors
+- invalid agent envelopes and HTTP protocol problems as execution errors
+
+`toolArguments` checks expected keys as a subset; extra actual properties are allowed. Nested objects recurse. Arrays must match exactly.
+
+## Quick Start
+
+Node.js 18+. No npm dependencies.
+
+```bash
+git clone https://github.com/Chan405/agentflow-test.git
+cd agentflow-test
+```
+
+The included fake agent can run in-process or through the mock HTTP server. Commands, config, and first-run errors: [docs/QUICKSTART.md](docs/QUICKSTART.md).
+
+## Example Test
+
+Cases live in the JSON file named by `tests` in `agentflow.config.json`.
 
 ```json
 {
-  "name": "support escalation workflow",
+  "name": "wifi issue routes to troubleshooting",
   "input": {
-    "message": "My internet is still down after restarting"
+    "message": "My wifi keeps dropping every few minutes"
   },
   "expect": {
     "agentPath": ["orchestrator", "troubleshooting_agent"],
-    "tracePath": [
-      { "type": "agent", "name": "orchestrator" },
-      { "type": "agent", "name": "troubleshooting_agent" },
-      { "type": "tool", "name": "diagnostic_tool" }
-    ],
-    "tools": ["diagnostic_tool"],
-    "toolArguments": {
-      "diagnostic_tool": {
-        "call": 0,
-        "arguments": {
-          "connection": "internet"
-        }
-      }
-    },
-    "forbiddenAgents": ["sales_agent"],
-    "output": {
-      "contains": ["troubleshoot"],
-      "notContains": ["upgrade"]
-    }
+    "forbiddenAgents": ["sales_agent"]
   }
 }
 ```
 
-`agents` and `tools` check presence only. `agentPath` is the exact agent sequence. `tracePath` is the exact agent and tool sequence. `toolArguments` compares expected keys as a subset; extra actual properties are allowed. Nested objects are compared recursively. Arrays must match exactly. If the same tool is called more than once, use a zero-based `call` index. Unindexed `toolArguments` are only valid when that tool was called once.
+## Example Failure
 
-`output.equals` is exact and case-sensitive. `output.contains` and `output.notContains` are case-insensitive substrings.
+```text
+AgentFlow Test
 
-Unknown `expect` keys are rejected. An empty `expect` object is rejected. A malformed test is a config error, not a workflow failure.
+✗ wifi issue routes to troubleshooting
 
-## Normalized Trace Format
+  Forbidden agent "sales_agent" was called
 
-Adapters must return:
+  Expected agent path:
+  orchestrator -> troubleshooting_agent
+
+  Actual agent path:
+  orchestrator -> sales_agent
+
+-------------------
+Tests: 1
+Passed: 0
+Failed: 1
+Config errors: 0
+Execution errors: 0
+-------------------
+```
+
+Config problems are labeled `CONFIG ERROR`. Invalid agent responses and HTTP failures are labeled `EXECUTION ERROR`. Any of those exits non-zero.
+
+## How It Works
+
+```text
+test definition
+→ agent adapter
+→ normalized trace
+→ evaluator
+→ report
+```
+
+Each case sends `input` to the configured target. The adapter must return:
 
 ```json
 {
@@ -94,96 +123,27 @@ Adapters must return:
 }
 ```
 
-- `output` must be a string
-- `trace` must be an array
-- each step must have `type` and `name`
-- `type` must be `agent` or `tool`
-- tool `arguments` are optional and must be an object when present
+The evaluator compares that against `expect`. The reporter prints passes, failures, and a summary.
 
-A missing or invalid envelope is an execution error. A malformed step is reported and is not ignored.
+## Supported Targets
 
-## Local Mode
+Configured in `agentflow.config.json`:
 
-`agentflow.config.json`:
+- **local** — a Node module that exports `run(input)` (or the function itself)
+- **http** — `POST` JSON `input` to `target.endpoint`; response body must be `{ output, trace }`
 
-```json
-{
-  "type": "local"
-}
-```
-
-Local mode runs `examples/fake-agent.js` in-process.
-
-```bash
-npm test
-```
-
-## HTTP Mode
-
-Start the mock server:
-
-```bash
-node examples/mock-server.js
-```
-
-`agentflow.config.json`:
-
-```json
-{
-  "type": "http",
-  "endpoint": "http://localhost:3001/agent"
-}
-```
-
-```bash
-npm test
-```
-
-The HTTP adapter `POST`s JSON `{ "message": "..." }` to the configured endpoint and expects the normalized `{ output, trace }` body. There is no authentication.
-
-## Running Tests
-
-```bash
-npm test
-```
-
-This runs the evaluator unit tests, then `src/runner.js` against `tests/workflows.json` using the adapter in `agentflow.config.json`.
-
-Any failed assertion, config error, or execution error exits with a non-zero status.
-
-## Failure Example
-
-```text
-AgentFlow Test
-
-✓ wifi issue routes to troubleshooting
-
-✗ booking uses correct arguments
-
-  Tool: booking_tool
-
-  customer.name
-  expected: "Alice"
-  received: "Bob"
-
--------------------
-Tests: 2
-Passed: 1
-Failed: 1
-Config errors: 0
-Execution errors: 0
--------------------
-```
-
-Config problems are labeled `CONFIG ERROR`. Invalid agent responses and HTTP protocol problems are labeled `EXECUTION ERROR`.
+There is no authentication.
 
 ## Current Limitations
 
 - Experimental. Not production-ready
-- Only `local` and `http` adapters
-- Project-level config only (`agentflow.config.json`)
-- HTTP adapter uses Node's built-in `fetch` and expects JSON
-- No authentication, retries, or per-test adapter overrides
-- Output checks are exact equality or substring match, not semantic similarity
-- `tracePath` ignores tool arguments
-- `agentPath` ignores tools
+- Not an installable CLI yet (`node src/runner.js` or `npm test`)
+- Only `local` and `http` targets
+- One project-level config file; no per-test adapter overrides
+- HTTP uses Node `fetch`, expects JSON, no retries
+- Output checks are exact or substring match, not semantic similarity
+- `agentPath` ignores tools; `tracePath` ignores tool arguments
+
+## Status
+
+v0.1.0 experimental alpha.
