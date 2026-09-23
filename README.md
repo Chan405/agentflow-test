@@ -51,7 +51,7 @@ git clone https://github.com/Chan405/agentflow-test.git
 cd agentflow-test
 ```
 
-The included fake agent can run in-process or through the mock HTTP server. Commands, config, and first-run errors: [docs/QUICKSTART.md](docs/QUICKSTART.md).
+The included fake agent can run in-process or through the mock HTTP server. Start the bundled HTTP example with `npm run example:http` (see [docs/QUICKSTART.md](docs/QUICKSTART.md)). If port 3001 is already in use, another process or mock server may already be running.
 
 ## Example Test
 

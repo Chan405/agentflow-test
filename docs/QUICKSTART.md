@@ -49,10 +49,10 @@ That loads `examples/local/fake-agent.js` and runs `tests/workflows.json`.
 In a second terminal:
 
 ```bash
-node examples/http/mock-server.js
+npm run example:http
 ```
 
-You should see `Mock agent server listening on http://localhost:3001`.
+You should see `Mock agent server listening on http://localhost:3001`. If port 3001 is already in use, another process or mock server may already be running.
 
 Point config back at HTTP (this is the repo default):
 
@@ -160,12 +160,12 @@ There is no auth, retries, or per-test adapter override. Then edit `tests/workfl
 
 | What you see | Usual cause |
 |---|---|
-| `HTTP adapter network failure: ...` on every case | HTTP target, but `node examples/http/mock-server.js` is not running |
+| `HTTP adapter network failure: ...` on every case | HTTP target, but `npm run example:http` is not running |
 | `Missing agentflow.config.json` | Command was not run from the repo root |
 | `Unsupported target type "...". Use "local" or "http".` | `target.type` is not `local` or `http` |
 | `HTTP target requires an "endpoint"` / `Local target requires a "module"` | That field is missing from `target` |
 | `Tests file not found: ...` | `tests` path in config is wrong |
 | `Agent returned an invalid result` / `invalid trace` / `HTTP adapter received invalid JSON` | Response is not `{ output, trace }` JSON |
 | `HTTP adapter received HTTP 404` | Endpoint path is not the one the server serves (`/agent` on the mock) |
-| `EADDRINUSE` on port 3001 | Something else is already bound to the mock port |
+| `EADDRINUSE` on port 3001 | Another process or mock server may already be running |
 | `fetch is not defined` or `Cannot find module 'node:test'` | Node is older than 18 |
